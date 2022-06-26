@@ -57,8 +57,8 @@ void test_multi_logger(const int num_repeat) {
   const auto log_base_path = "../../log/log";
   const auto log_max_keep_days = 10;
 
-  set_multi_level_files_logger_thread_safe(LogLevel::TRACE, "logger", log_base_path, log_max_size_bytes,
-                                           log_max_keep_days);
+  init_multi_level_files_logger_thread_safe(LogLevel::TRACE, "logger", log_base_path, log_max_size_bytes,
+                                            log_max_keep_days);
 
   for (int i = 0; i < num_repeat; ++i) {
     LOG_TRACE("trace log {} {}", i, "yyyy");

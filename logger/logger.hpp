@@ -260,7 +260,7 @@ static void init_global_static_variables() {
 }
 
 
-spdlog::level::level_enum to_spd_level(const LogLevel &level) {
+inline spdlog::level::level_enum to_spd_level(const LogLevel &level) {
   switch (level) {
     case LogLevel::TRACE:
       return spdlog::level::trace;
@@ -382,7 +382,7 @@ inline void set_multi_level_files_logger(const LogLevel &log_level, const std::s
 
 } // namespace details
 
-inline void set_multi_level_files_logger_thread_safe(const LogLevel &log_level, const std::string &logger_basename,
+inline void init_multi_level_files_logger_thread_safe(const LogLevel &log_level, const std::string &logger_basename,
                                                      const std::string &log_base_path_wo_suffix,
                                                      size_t max_file_size_bytes, size_t max_keep_days) {
   static std::once_flag once_flag;
