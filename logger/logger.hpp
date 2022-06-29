@@ -43,8 +43,8 @@
 #define FILENAME_ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 
 
-namespace spdlog {
-namespace sinks {
+namespace spdlog::sinks {
+
 template<typename Mutex>
 class easy_file_sink final : public base_sink<Mutex> {
 public:
@@ -59,13 +59,10 @@ public:
 
     if (max_keep_days_ > 0) {
       file_path_list_.push_back(std::move(std::set<filename_t>()));
-      file_path_list_[file_path_list_.size() - 1].insert(filename);
+      file_path_list_.back().insert(filename);
     }
-  }
 
-  filename_t filename() {
-    std::lock_guard<Mutex> lock(base_sink<Mutex>::mutex_);
-    return file_helper_.filename();
+    file_path_list_.reserve(max_keep_days);
   }
 
 protected:
@@ -84,7 +81,7 @@ protected:
 
       {
         file_path_list_.push_back(std::move(std::set<filename_t>()));
-        file_path_list_[file_path_list_.size() - 1].emplace(filename);
+        file_path_list_.back().emplace(filename);
       }
 
       // Do the cleaning only at the end because it might throw on failure.
@@ -93,8 +90,7 @@ protected:
     } else if (current_size_ >= max_size_) {
       file_helper_.close();
       auto src_name = gen_filename_by_daily(base_filename_, now_tm(time));
-      auto target_name =
-          gen_filename_by_filesize(base_filename_, now_tm(time), file_path_list_[file_path_list_.size() - 1].size());
+      auto target_name = gen_filename_by_filesize(base_filename_, now_tm(time), file_path_list_.back().size());
 
       // rename file if failed then us `target_name` as src_name.
       if (!rename_file_(src_name, target_name)) {
@@ -105,9 +101,9 @@ protected:
         }
       }
 
-      file_path_list_[file_path_list_.size() - 1].emplace(src_name);
+      file_path_list_.back().emplace(src_name);
       if (src_name != target_name)
-        file_path_list_[file_path_list_.size() - 1].emplace(target_name);
+        file_path_list_.back().emplace(target_name);
 
       file_helper_.open(src_name, false);
       current_size_ = file_helper_.size();
@@ -171,7 +167,7 @@ private:
   static filename_t gen_filename_by_filesize(const filename_t &filename, const tm &now_tm, const int &idx) {
     filename_t basename, ext;
     std::tie(basename, ext) = details::file_helper::split_by_extension(filename);
-    return fmt::format(SPDLOG_FILENAME_T("{}-{:04d}{:02d}{:02d}-{:02d}{:02d}{:02d}.{:d}{}"), basename,
+    return fmt::format(SPDLOG_FILENAME_T("{}-{:04d}{:02d}{:02d}-{:02d}{:02d}{:02d}-{:d}{}"), basename,
                        now_tm.tm_year + 1900, now_tm.tm_mon + 1, now_tm.tm_mday, now_tm.tm_hour, now_tm.tm_min,
                        now_tm.tm_sec, idx, ext);
   }
@@ -193,21 +189,7 @@ private:
 using easy_file_sink_mt = easy_file_sink<std::mutex>;
 using easy_file_sink_st = easy_file_sink<details::null_mutex>;
 
-} // namespace sinks
-
-template<typename Factory = spdlog::synchronous_factory>
-inline std::shared_ptr<logger> easy_logger_mt(std::string logger_name, const filename_t &filename, size_t max_size,
-                                              size_t max_keep_days = -1) {
-  return Factory::template create<sinks::easy_file_sink_mt>(std::move(logger_name), filename, max_size, max_keep_days);
-}
-
-template<typename Factory = spdlog::synchronous_factory>
-inline std::shared_ptr<logger> easy_logger_st(const std::string &logger_name, const filename_t &filename,
-                                              size_t max_size, size_t max_keep_days = -1) {
-  return Factory::template create<sinks::easy_file_sink_st>(logger_name, filename, max_size, max_keep_days);
-}
-
-} // namespace spdlog
+} // namespace spdlog::sinks
 
 
 #define LOG_TRACE(...)                                                                                                 \
@@ -233,10 +215,6 @@ enum class LogLevel {
   CRITICAL = 5,
 };
 
-
-/**
- * @brief 使用global pointer实现不同level日志写入不同文件的功能
- */
 
 static std::shared_ptr<spdlog::logger> g_logger_trace_ptr{nullptr}, g_logger_debug_ptr{nullptr},
     g_logger_info_ptr{nullptr}, g_logger_warn_ptr{nullptr}, g_logger_error_ptr{nullptr}, g_logger_critical_ptr{nullptr};
@@ -307,12 +285,12 @@ inline std::shared_ptr<spdlog::logger> make_shared_logger(const LogLevel &level,
   };
 
   if (level >= LogLevel::WARN) {
-    sinks.reserve(2);
+    // sinks.reserve(2);
     sinks.push_back(std::make_shared<spdlog::sinks::stderr_color_sink_mt>());
   }
 #if 1
   else if (level == LogLevel::INFO) {
-    sinks.reserve(2);
+    // sinks.reserve(2);
     sinks.push_back(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
   }
 #endif
@@ -320,7 +298,9 @@ inline std::shared_ptr<spdlog::logger> make_shared_logger(const LogLevel &level,
 
   auto logger = std::make_shared<spdlog::logger>(std::move(logger_name), std::begin(sinks), std::end(sinks));
   logger->set_level(spd_level);
-  logger->set_pattern("[%L %C-%m-%d %T.%e %P %t %!] [%s:%#] %v");
+  // logger->set_pattern("[%L %Y/%m/%d %T.%e (pid)%P (k-tid)%t] [%!] %v");
+  // [leve data time process-id kernel-thread-id] [logger-name] [filename:line-number] ...
+  logger->set_pattern("[%L %Y/%m/%d %T.%e (P)%P (T)%t] [%!] [%s:%#] %v");
   return logger;
 }
 
@@ -329,6 +309,7 @@ inline void set_logger_native(std::shared_ptr<spdlog::logger> &logger, std::shar
     logger = std::move(ptr);
   }
 }
+
 
 inline void set_global_logger_pointer_by_log_level(const LogLevel &level, std::shared_ptr<spdlog::logger> &&ptr) {
   switch (level) {
@@ -362,7 +343,7 @@ inline void set_multi_level_files_logger(const LogLevel &log_level, const std::s
     throw spdlog::spdlog_ex("`max_file_size_bytes` and `max_keep_days` must greater than zero !!!");
   }
 
-  fmt::print(">>> set_multi_level_files_logger called.\n");
+  // fmt::print(">>> set_multi_level_files_logger called.\n");
 
   init_global_static_variables();
 
@@ -379,13 +360,21 @@ inline void set_multi_level_files_logger(const LogLevel &log_level, const std::s
     details::set_global_logger_pointer_by_log_level(level, std::move(logger));
   }
 }
-
 } // namespace details
 
+
+// interface.
+
 inline void init_multi_level_files_logger_thread_safe(const LogLevel &log_level, const std::string &logger_basename,
-                                                     const std::string &log_base_path_wo_suffix,
-                                                     size_t max_file_size_bytes, size_t max_keep_days) {
+                                                      const std::string &log_base_path_wo_suffix,
+                                                      size_t max_file_size_mb, size_t max_keep_days) noexcept(false) {
+
+  if (max_file_size_mb <= 0 || max_keep_days <= 0) {
+    throw std::logic_error(fmt::format("param check failed, `max_file_size_mb`: {} `max_keep_days`: {}\n",
+                                       max_file_size_mb, max_keep_days));
+  }
+
   static std::once_flag once_flag;
   std::call_once(once_flag, details::set_multi_level_files_logger, log_level, logger_basename, log_base_path_wo_suffix,
-                 max_file_size_bytes, max_keep_days);
+                 max_file_size_mb * 1024 * 1024, max_keep_days);
 }

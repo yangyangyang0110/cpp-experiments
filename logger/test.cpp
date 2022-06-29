@@ -22,42 +22,12 @@ void function_wrapper(Func &&func, Args &&...args) {
   } catch (const spdlog::spdlog_ex &e) { printf(">>> catch exception, error raeson: %s.\n", e.what()); }
 }
 
-void test_combined_sinks() {
-  auto log_path = "./log/log.log";
-  auto max_size_bytes = 100;
-  auto max_files = 2;
-  std::vector<spdlog::sink_ptr> sinks{
-      std::make_shared<spdlog::sinks::rotating_file_sink_mt>(log_path, max_size_bytes, max_files),
-      std::make_shared<spdlog::sinks::daily_file_sink_mt>(log_path, 23, 59)};
-
-  spdlog::logger logger("combined_logger", std::begin(sinks), std::end(sinks));
-  logger.set_level(spdlog::level::trace);
-
-  logger.trace("trace log");
-  logger.debug("debug log");
-  logger.info("info log");
-  logger.warn("warn log");
-  logger.error("error log");
-}
-
-void test_color_sink() {
-  auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
-  console_sink->set_level(spdlog::level::debug);
-  console_sink->set_pattern("[color_sink_example] [%^%l%$] %v");
-
-  spdlog::logger logger("color-sink", {console_sink});
-  logger.debug("debug log");
-  logger.info("info log");
-  logger.warn("warn log");
-  logger.error("error log");
-}
-
 void test_multi_logger(const int num_repeat) {
-  const auto log_max_size_bytes = 10 * 1024 * 1024;
+  const auto log_max_size_mb = 10;
   const auto log_base_path = "../../log/log";
   const auto log_max_keep_days = 10;
 
-  init_multi_level_files_logger_thread_safe(LogLevel::TRACE, "logger", log_base_path, log_max_size_bytes,
+  init_multi_level_files_logger_thread_safe(LogLevel::TRACE, "logger", log_base_path, log_max_size_mb,
                                             log_max_keep_days);
 
   for (int i = 0; i < num_repeat; ++i) {
