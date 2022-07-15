@@ -1,5 +1,6 @@
 [requires]
 spdlog/1.10.0
+opencv/4.5.5
 
 [generators]
 cmake

@@ -1,3 +1,3 @@
 file(GLOB files ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
-dynamic_build_execute("logger" ${files})
+dynamic_build_execute("concurrency" ${files})
 

@@ -5,15 +5,13 @@
  * @Email: yangzilong@objecteye.com
  * @Description:
  */
-#include "./logger.hpp"
-#include "spdlog/logger.h"
-#include "spdlog/sinks/daily_file_sink.h"
-#include "spdlog/sinks/rotating_file_sink.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
+#include "helper/logger.hpp"
 #include <future>
 #include <iostream>
 #include <spdlog/common.h>
 #include <utility>
+
+using namespace helper::logger;
 
 template<typename Func, typename... Args>
 void function_wrapper(Func &&func, Args &&...args) {
